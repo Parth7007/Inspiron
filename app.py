@@ -1,3 +1,4 @@
+# app.py
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 from modules.devfeedback import DeveloperFeedback
 from modules.autocomplete import generate_code_completion
 from modules.autocomment import generate_code_comments
+from modules.meme import MemeGenerator  # Import the new MemeGenerator
 import asyncio
 import logging
 from dotenv import load_dotenv
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Developer Assistant API with Feedback")
 
-# CORS configuration (combining both sets of origins)
+# CORS configuration
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
@@ -34,17 +36,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Supabase setup (from devfeedback.py)
+# Supabase setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Groq setup (from devfeedback.py)
+# Groq setup
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # Initialize DeveloperFeedback
 dev_feedback = DeveloperFeedback(supabase, groq_client)
+
+# Initialize MemeGenerator
+meme_generator = MemeGenerator(groq_client)
 
 # Pydantic models
 class CodeEvent(BaseModel):
@@ -65,7 +70,10 @@ class CodeCommentRequest(BaseModel):
     language: str
     file_name: str = ""  # Optional
 
-# Developer Feedback Endpoints (from devfeedback.py)
+class CodeReviewMemeRequest(BaseModel):  # New model for meme endpoint
+    code: str
+
+# Developer Feedback Endpoints
 @app.get("/start-session/{username}")
 async def start_session(username: str):
     user = supabase.table("users").select("user_id").eq("username", username).execute().data
@@ -96,7 +104,7 @@ async def get_feedback(session_id: str):
     logger.info(f"Feedback response sent to frontend: {feedback}")
     return {"feedback": feedback}
 
-# AI Developer Assistant Endpoints (from main project)
+# AI Developer Assistant Endpoints
 @app.post("/api/autocomplete")
 async def autocomplete(request: CodeCompletionRequest):
     try:
@@ -122,6 +130,17 @@ async def autocomment(request: CodeCommentRequest):
         return comment_results
     except Exception as e:
         logger.error(f"Error in autocomment endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# New Meme Endpoint
+@app.post("/api/code-review-meme")
+async def code_review_meme(request: CodeReviewMemeRequest):
+    try:
+        meme_result = await meme_generator.generate_meme_review(request.code)
+        logger.info(f"Meme generated: {meme_result}")
+        return meme_result
+    except Exception as e:
+        logger.error(f"Error in code-review-meme endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
