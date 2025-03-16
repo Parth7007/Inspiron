@@ -2,15 +2,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from modules.autocomplete import generate_code_completion
+from modules.autocomment import generate_code_comments
 import asyncio
 import logging
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 app = FastAPI(title="AI Developer Assistant API")
-
 # Add CORS middleware to allow requests from your React frontend
 app.add_middleware(
     CORSMiddleware,
@@ -19,13 +17,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 class CodeCompletionRequest(BaseModel):
     code: str
     language: str
     cursor_position: int
     file_name: str = ""  # Optional, might help with context
-
+class CodeCommentRequest(BaseModel):
+    code: str
+    language: str
+    file_name: str = ""  # Optional, might help with context
 @app.post("/api/autocomplete")
 async def autocomplete(request: CodeCompletionRequest):
     try:
@@ -41,11 +41,23 @@ async def autocomplete(request: CodeCompletionRequest):
     except Exception as e:
         logger.error(f"Error in autocomplete endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
+@app.post("/api/autocomment")
+async def autocomment(request: CodeCommentRequest):
+    try:
+        # Generate comments for the code
+        comment_results = await generate_code_comments(
+            code=request.code,
+            language=request.language,
+            file_name=request.file_name
+        )
+        
+        return comment_results
+    except Exception as e:
+        logger.error(f"Error in autocomment endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

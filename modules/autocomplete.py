@@ -64,7 +64,7 @@ async def generate_code_completion(
         }
         
         payload = {
-            "model": "llama3-70b-8192",
+            "model": "llama3-8b-8192",
             "messages": [
                 {"role": "system", "content": "You are an AI code assistant that provides concise and accurate code completions."},
                 {"role": "user", "content": prompt}
