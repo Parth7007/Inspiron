@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from modules.devfeedback import DeveloperFeedback
 from modules.autocomplete import generate_code_completion
 from modules.autocomment import generate_code_comments
-from modules.meme import MemeGenerator  # Import the new MemeGenerator
+from modules.meme import MemeGenerator
+from modules.autoformat import format_code  # Import the new format_code function
 import asyncio
 import logging
 from dotenv import load_dotenv
@@ -70,7 +71,12 @@ class CodeCommentRequest(BaseModel):
     language: str
     file_name: str = ""  # Optional
 
-class CodeReviewMemeRequest(BaseModel):  # New model for meme endpoint
+class CodeFormatRequest(BaseModel):  # New model for formatting endpoint
+    code: str
+    language: str
+    file_name: str = ""  # Optional
+
+class CodeReviewMemeRequest(BaseModel):
     code: str
 
 # Developer Feedback Endpoints
@@ -132,7 +138,24 @@ async def autocomment(request: CodeCommentRequest):
         logger.error(f"Error in autocomment endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# New Meme Endpoint
+# New Autoformat Endpoint
+@app.post("/api/autoformat")
+async def autoformat(request: CodeFormatRequest):
+    try:
+        logger.info(f"Formatting code in {request.language}, file name: {request.file_name}")
+        format_results = await format_code(
+            code=request.code,
+            language=request.language,
+            file_name=request.file_name,
+            groq_client=groq_client
+        )
+        logger.info(f"Format result success: {format_results['success']}")
+        return format_results
+    except Exception as e:
+        logger.error(f"Error in autoformat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Meme Endpoint
 @app.post("/api/code-review-meme")
 async def code_review_meme(request: CodeReviewMemeRequest):
     try:
